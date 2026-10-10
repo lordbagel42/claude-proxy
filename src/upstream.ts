@@ -59,6 +59,14 @@ export function upstreamUrl(env: Env, path: string, search: string): string {
   return `${base}${path}${search}`;
 }
 
+/**
+ * Strips a gateway-style provider prefix (`anthropic/claude-opus-5-5`), which
+ * OpenRouter-style clients send but the upstream API rejects as not found.
+ */
+export function normalizeModel(model: string): string {
+  return model.replace(/^anthropic\//i, "");
+}
+
 type SystemBlock = { type: string; text?: string; [key: string]: unknown };
 
 /**

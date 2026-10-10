@@ -3,6 +3,7 @@ import { clientKey, isAuthorized, parseProxyKeys } from "./auth";
 import type { Env } from "./env";
 import { errorResponse } from "./errors";
 import {
+  normalizeModel,
   proxiedResponse,
   upstreamHeaders,
   upstreamUrl,
@@ -74,7 +75,7 @@ for (const path of ["/v1/messages", "/v1/messages/count_tokens"]) {
       }
       body = parsed as Record<string, unknown>;
       if (typeof body.model === "string") {
-        body.model = body.model.replace(/^anthropic\//, "");
+        body.model = normalizeModel(body.model);
       }
       body.system = withIdentity(body.system);
       // Omitting fast mode selects the upstream's standard speed.
@@ -113,7 +114,7 @@ app.get("/v1/models/:id", (c) =>
     c.req.raw,
     c.env,
     c.var.token,
-    `/v1/models/${encodeURIComponent(c.req.param("id"))}`,
+    `/v1/models/${encodeURIComponent(normalizeModel(c.req.param("id")))}`,
   ),
 );
 

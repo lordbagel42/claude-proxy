@@ -13,7 +13,7 @@ the live API on 2026-10-10. Re-verify them when requests start failing.
 | `anthropic-version` | Client value, default `2023-06-01` | |
 | `User-Agent` | `claude-cli/<CLAUDE_CODE_VERSION> (external, cli)` | Plus `x-app: cli`, mirroring Claude Code. |
 | System prompt | First block must be exactly `You are Claude Code, Anthropic's official CLI for Claude.` | See below. |
-| Model | Strip one leading `anthropic/` from string model IDs | Applies to messages and token counts; bare IDs and other prefixes are unchanged. |
+| Model | Strip one leading `anthropic/` from string model IDs | Applies to messages, token counts, and `/v1/models/:id`; case-insensitive; bare IDs and other prefixes are unchanged. |
 | Speed | Remove `speed: "fast"` | Silently uses standard speed without changing the model, thinking, or effort. |
 
 Only `accept` and `idempotency-key` are forwarded from the client besides the
@@ -47,9 +47,13 @@ already matches, which keeps `cache_control` breakpoints intact.
 
 | Proxy route | Upstream | Notes |
 | --- | --- | --- |
-| `POST /v1/messages` | same | Body rewritten (identity and fast-mode removal), query string preserved (`?beta=true`). |
+| `POST /v1/messages` | same | Body rewritten (identity, model prefix, fast-mode removal), query string preserved (`?beta=true`). |
 | `POST /v1/messages/count_tokens` | same | Identity injected so counts match what is billed; fast mode removed. |
 | `GET /v1/models`, `GET /v1/models/:id` | same | Passthrough. |
+
+Gateway-style model IDs such as `anthropic/claude-opus-5-5` (OpenRouter
+convention) are rewritten to `claude-opus-5-5` in request bodies and
+`/v1/models/:id`; upstream answers the prefixed form with `not_found_error`.
 
 Not proxied: `/api/oauth/usage` requires the `user:profile` scope, which
 `setup-token` tokens lack. Usage is visible in the rate-limit response headers

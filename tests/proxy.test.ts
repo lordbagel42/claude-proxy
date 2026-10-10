@@ -74,7 +74,11 @@ describe("proxy", () => {
   it("rewrites auth, betas, and system before forwarding", async () => {
     const fetchMock = stubUpstream();
     const res = await messages(
-      { model: "claude-sonnet-5-5", system: "Be terse.", messages: [] },
+      {
+        model: "anthropic/claude-sonnet-5-5",
+        system: "Be terse.",
+        messages: [],
+      },
       {
         "anthropic-beta": "context-1m-2025-08-07, oauth-2025-04-20",
         cookie: "secret=1",
@@ -95,6 +99,7 @@ describe("proxy", () => {
       "oauth-2025-04-20,claude-code-20250219,context-1m-2025-08-07",
     );
     const body = JSON.parse(String(init?.body));
+    expect(body.model).toBe("claude-sonnet-5-5");
     expect(body.system[0].text).toBe(CLAUDE_CODE_IDENTITY);
     expect(body.system[1].text).toBe("Be terse.");
   });
