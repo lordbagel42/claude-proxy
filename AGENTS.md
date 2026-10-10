@@ -73,14 +73,16 @@ proxy depends on.
 ## Deployment safety
 
 - Raygen grants standing authorization to deploy reviewed code from `main` to
-  the existing `claude-proxy` Worker and to update its existing secrets and
-  variables when a requested change requires it. Do not ask again merely
-  because completing the requested feature requires these actions.
+  the existing `claude-proxy` Worker (served at `claude.raygen.dev`) and to
+  update its existing secrets and variables when a requested change requires
+  it. Do not ask again merely because completing the requested feature
+  requires these actions.
 - This permission is scoped to the requested outcome. It does not authorize
   creating unrelated Cloudflare resources, changing routes or custom domains,
   deleting Workers or data, or rotating the subscription token without being
   asked.
 - Deploy with `pnpm run deploy` (Wrangler) or the CI deploy job, not ad hoc
   dashboard edits. Repository publication is not evidence of deployment: verify
-  the deployed version (`wrangler deployments list`) and a live health check.
+  the deployed version (`wrangler deployments list`) and a live
+  `https://claude.raygen.dev/health` check.
 - Do not change configuration or secrets concurrently with a deployment.

@@ -4,6 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "observability": { "enabled": true },
+  "routes": [{ "pattern": "claude.raygen.dev", "custom_domain": true }],
   "vars": {
     "UPSTREAM_BASE_URL": "https://api.anthropic.com",
     "CLAUDE_CODE_VERSION": "2.1.296"

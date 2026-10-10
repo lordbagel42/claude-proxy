@@ -45,6 +45,11 @@ pnpm exec wrangler secret put PROXY_API_KEYS   # e.g. "laptop-key,ci-key"
 pnpm run deploy
 ```
 
+The Worker is served at `https://claude.raygen.dev` through a Cloudflare
+custom domain (`routes` in `wrangler.jsonc`), which requires the `raygen.dev`
+zone to be in the same Cloudflare account. Wrangler creates the DNS record and
+certificate on deploy. To use a different hostname, change that route.
+
 Generate proxy keys with `openssl rand -hex 32`. Multiple comma-separated keys
 let you revoke one client without rotating the others. The proxy refuses all
 API requests when `PROXY_API_KEYS` is unset.
@@ -61,7 +66,7 @@ API requests when `PROXY_API_KEYS` is unset.
 Clients send the proxy key as `x-api-key` or `Authorization: Bearer`.
 
 ```sh
-curl https://claude-proxy.<you>.workers.dev/v1/messages \
+curl https://claude.raygen.dev/v1/messages \
   -H "x-api-key: $PROXY_KEY" -H "content-type: application/json" \
   -d '{"model":"claude-sonnet-5-5","max_tokens":1024,
        "messages":[{"role":"user","content":"Hello"}]}'
@@ -71,7 +76,7 @@ curl https://claude-proxy.<you>.workers.dev/v1/messages \
 import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({
-  baseURL: "https://claude-proxy.<you>.workers.dev",
+  baseURL: "https://claude.raygen.dev",
   apiKey: process.env.PROXY_KEY,
 });
 ```
