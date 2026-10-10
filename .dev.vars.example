@@ -1,0 +1,3 @@
+# Copy to .dev.vars for `pnpm dev`. Never commit .dev.vars.
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+PROXY_API_KEYS=local-dev-key

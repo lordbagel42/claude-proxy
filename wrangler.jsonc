@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "claude-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  "vars": {
+    "UPSTREAM_BASE_URL": "https://api.anthropic.com",
+    "CLAUDE_CODE_VERSION": "2.1.296"
+  }
+  // Secrets (set with `wrangler secret put`, or `.dev.vars` locally):
+  //   CLAUDE_CODE_OAUTH_TOKEN  token from `claude setup-token`
+  //   PROXY_API_KEYS           comma-separated keys clients must present
+}
