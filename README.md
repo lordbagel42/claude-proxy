@@ -86,6 +86,10 @@ subscription requires it for non-Haiku models); your own system prompt follows
 it unchanged. Subscription usage is reported in the
 `anthropic-ratelimit-unified-*` response headers.
 
+Fast mode is disabled: requests with `speed: "fast"` silently run at standard
+speed with the same model and reasoning settings. Fast-mode beta flags are
+also removed before forwarding.
+
 ## Development
 
 ```sh

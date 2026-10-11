@@ -24,7 +24,7 @@ export function mergeBetas(clientBetas: string | null): string {
   const betas = new Set(OAUTH_BETAS);
   for (const beta of (clientBetas ?? "").split(",")) {
     const trimmed = beta.trim();
-    if (trimmed) betas.add(trimmed);
+    if (trimmed && !trimmed.startsWith("fast-mode-")) betas.add(trimmed);
   }
   return [...betas].join(",");
 }

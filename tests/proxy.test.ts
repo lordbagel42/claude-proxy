@@ -99,6 +99,62 @@ describe("proxy", () => {
     expect(body.system[1].text).toBe("Be terse.");
   });
 
+  it.each([
+    { path: "/v1/messages", stream: false, speed: "fast" },
+    { path: "/v1/messages", stream: true, speed: "fast" },
+    { path: "/v1/messages/count_tokens", speed: "fast" },
+    { path: "/v1/messages", speed: "standard" },
+    { path: "/v1/messages" },
+  ])(
+    "disables fast mode without changing other options: %j",
+    async (options) => {
+      const fetchMock = stubUpstream();
+      const body = {
+        model: "claude-opus-5-5",
+        max_tokens: 64,
+        messages: [{ role: "user", content: "Hello" }],
+        thinking: { type: "adaptive" },
+        output_config: { effort: "high" },
+        stream: options.stream,
+        speed: options.speed,
+      };
+      const res = await app.request(
+        options.path,
+        {
+          method: "POST",
+          headers: {
+            "x-api-key": "key-one",
+            "anthropic-beta":
+              "fast-mode-2026-02-01, context-1m-2025-08-07, fast-mode-2099-01-01",
+          },
+          body: JSON.stringify(body),
+        },
+        env,
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+      const [url, init] = fetchMock.mock.calls[0] ?? [];
+      expect(url).toBe(`https://upstream.test${options.path}`);
+      const forwarded = JSON.parse(String(init?.body));
+      expect(forwarded).toMatchObject({
+        model: "claude-opus-5-5",
+        max_tokens: 64,
+        messages: [{ role: "user", content: "Hello" }],
+        thinking: { type: "adaptive" },
+        output_config: { effort: "high" },
+      });
+      expect(forwarded.stream).toBe(options.stream);
+      if (options.speed === "standard") {
+        expect(forwarded.speed).toBe("standard");
+      } else {
+        expect(forwarded).not.toHaveProperty("speed");
+      }
+      expect(new Headers(init?.headers).get("anthropic-beta")).toBe(
+        "oauth-2025-04-20,claude-code-20250219,context-1m-2025-08-07",
+      );
+    },
+  );
+
   it("accepts bearer keys and strips account headers from responses", async () => {
     stubUpstream(
       new Response("event: ping\n\n", {

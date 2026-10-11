@@ -74,6 +74,8 @@ for (const path of ["/v1/messages", "/v1/messages/count_tokens"]) {
       }
       body = parsed as Record<string, unknown>;
       body.system = withIdentity(body.system);
+      // Omitting fast mode selects the upstream's standard speed.
+      if (body.speed === "fast") delete body.speed;
     } catch (error) {
       const message = error instanceof Error ? error.message : `${error}`;
       return errorResponse(400, "invalid_request_error", message);

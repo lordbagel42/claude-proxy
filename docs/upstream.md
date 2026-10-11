@@ -9,15 +9,24 @@ the live API on 2026-10-10. Re-verify them when requests start failing.
 | Item | Value | Notes |
 | --- | --- | --- |
 | Auth | `Authorization: Bearer <CLAUDE_CODE_OAUTH_TOKEN>` | Token from `claude setup-token` (`sk-ant-oat01-…`, valid for one year, scope `user:inference`). |
-| `anthropic-beta` | `oauth-2025-04-20,claude-code-20250219` + client betas | `oauth-2025-04-20` is what Claude Code sends for OAuth; the rest mirror Claude Code. |
+| `anthropic-beta` | `oauth-2025-04-20,claude-code-20250219` + client betas, except `fast-mode-*` | Fast-mode betas are stripped; all other client betas are preserved. |
 | `anthropic-version` | Client value, default `2023-06-01` | |
 | `User-Agent` | `claude-cli/<CLAUDE_CODE_VERSION> (external, cli)` | Plus `x-app: cli`, mirroring Claude Code. |
 | System prompt | First block must be exactly `You are Claude Code, Anthropic's official CLI for Claude.` | See below. |
+| Speed | Remove `speed: "fast"` | Silently uses standard speed without changing the model, thinking, or effort. |
 
 Only `accept` and `idempotency-key` are forwarded from the client besides the
 headers above. Upstream responses pass through unchanged (including the
 `anthropic-ratelimit-unified-*` subscription usage headers and SSE streams),
 except `set-cookie`, `anthropic-organization-id`, and `anthropic-workspace-id`.
+
+Fast mode is intentionally disabled on both message and token-count requests.
+The [upstream fast-mode contract](https://platform.claude.com/docs/en/build-with-claude/fast-mode)
+(checked 2026-10-11) selects fast inference with `speed: "fast"` and the
+`fast-mode-2026-02-01` beta; omitting that speed requests standard inference.
+The proxy removes the fast speed and every `fast-mode-*` beta before the first
+upstream call, rather than attempting fast inference and retrying. Explicit
+`speed: "standard"` and unrelated request options are left unchanged.
 
 ## The identity block
 
@@ -37,8 +46,8 @@ already matches, which keeps `cache_control` breakpoints intact.
 
 | Proxy route | Upstream | Notes |
 | --- | --- | --- |
-| `POST /v1/messages` | same | Body rewritten (identity), query string preserved (`?beta=true`). |
-| `POST /v1/messages/count_tokens` | same | Identity injected so counts match what is billed. |
+| `POST /v1/messages` | same | Body rewritten (identity and fast-mode removal), query string preserved (`?beta=true`). |
+| `POST /v1/messages/count_tokens` | same | Identity injected so counts match what is billed; fast mode removed. |
 | `GET /v1/models`, `GET /v1/models/:id` | same | Passthrough. |
 
 Not proxied: `/api/oauth/usage` requires the `user:profile` scope, which
