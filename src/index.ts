@@ -73,6 +73,9 @@ for (const path of ["/v1/messages", "/v1/messages/count_tokens"]) {
         throw new TypeError("body must be a JSON object");
       }
       body = parsed as Record<string, unknown>;
+      if (typeof body.model === "string") {
+        body.model = body.model.replace(/^anthropic\//, "");
+      }
       body.system = withIdentity(body.system);
       // Omitting fast mode selects the upstream's standard speed.
       if (body.speed === "fast") delete body.speed;

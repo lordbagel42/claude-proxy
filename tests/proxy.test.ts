@@ -99,6 +99,32 @@ describe("proxy", () => {
     expect(body.system[1].text).toBe("Be terse.");
   });
 
+  it.each(["/v1/messages", "/v1/messages/count_tokens"])(
+    "strips only a leading anthropic/ model prefix on %s",
+    async (path) => {
+      for (const [model, expected] of [
+        ["anthropic/claude-opus-5-5", "claude-opus-5-5"],
+        ["claude-opus-5-5", "claude-opus-5-5"],
+        ["other/claude-opus-5-5", "other/claude-opus-5-5"],
+        ["other/anthropic/claude-opus-5-5", "other/anthropic/claude-opus-5-5"],
+      ]) {
+        const fetchMock = stubUpstream();
+        const res = await app.request(
+          path,
+          {
+            method: "POST",
+            headers: { "x-api-key": "key-one" },
+            body: JSON.stringify({ model, messages: [] }),
+          },
+          env,
+        );
+        expect(res.status).toBe(200);
+        const [, init] = fetchMock.mock.calls[0] ?? [];
+        expect(JSON.parse(String(init?.body)).model).toBe(expected);
+      }
+    },
+  );
+
   it.each([
     { path: "/v1/messages", stream: false, speed: "fast" },
     { path: "/v1/messages", stream: true, speed: "fast" },
