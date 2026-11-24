@@ -3,6 +3,7 @@ export type AnthropicErrorType =
   | "authentication_error"
   | "permission_error"
   | "not_found_error"
+  | "request_too_large"
   | "api_error";
 
 /** Builds an error response in the Anthropic API's error shape. */

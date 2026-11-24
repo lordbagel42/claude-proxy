@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { prepareBody } from "../src/body";
 import type { Env } from "../src/env";
 import app from "../src/index";
-import { CLAUDE_CODE_IDENTITY, withIdentity } from "../src/upstream";
+import { CLAUDE_CODE_IDENTITY } from "../src/upstream";
 
 const env: Env = {
   CLAUDE_CODE_OAUTH_TOKEN: "sk-ant-oat01-test",
@@ -31,20 +32,72 @@ function messages(body: unknown, headers: Record<string, string> = {}) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("withIdentity", () => {
-  it("puts the identity in its own first block", () => {
-    expect(withIdentity(undefined)).toEqual([
-      { type: "text", text: CLAUDE_CODE_IDENTITY },
-    ]);
-    expect(withIdentity("Be terse.")).toEqual([
-      { type: "text", text: CLAUDE_CODE_IDENTITY },
-      { type: "text", text: "Be terse." },
-    ]);
-    const existing = [
-      { type: "text", text: CLAUDE_CODE_IDENTITY },
-      { type: "text", text: "x", cache_control: { type: "ephemeral" } },
+function sent(init: RequestInit | undefined): string {
+  return new TextDecoder().decode(init?.body as Uint8Array);
+}
+
+describe("prepareBody", () => {
+  const identity = { type: "text", text: CLAUDE_CODE_IDENTITY };
+  const rewrite = (raw: string) => {
+    const prepared = prepareBody(new TextEncoder().encode(raw));
+    return {
+      ...prepared,
+      body: JSON.parse(new TextDecoder().decode(prepared.payload)),
+    };
+  };
+
+  it("shapes the body while keeping everything else byte-for-byte", () => {
+    const cases: [string, unknown][] = [
+      ["{}", [identity]],
+      ['{ "system" : null }', [identity]],
+      ['{"system":""}', [identity]],
+      [
+        '{"system":"Be \\"terse\\"."}',
+        [identity, { type: "text", text: 'Be "terse".' }],
+      ],
+      ['{"system":[]}', [identity]],
+      [
+        '{"system":[{"type":"text","text":"x"}]}',
+        [identity, { type: "text", text: "x" }],
+      ],
     ];
-    expect(withIdentity(existing)).toBe(existing);
+    for (const [raw, system] of cases) {
+      expect(rewrite(raw).body.system).toEqual(system);
+    }
+    const tail = '"messages":[{"role":"user","content":"a,b]}["}],"x":1';
+    const { body, messages } = rewrite(
+      `{"speed":"fast", "model" :"Anthropic/claude-haiku-4-5",${tail}}`,
+    );
+    expect(body).toEqual({
+      model: "claude-haiku-4-5",
+      messages: [{ role: "user", content: "a,b]}[" }],
+      x: 1,
+      system: [identity],
+    });
+    expect(messages).toBe(1);
+    expect(rewrite('{"a":1,"speed":"fast"}').body).toEqual({
+      a: 1,
+      system: [identity],
+    });
+    expect(rewrite('{"speed":"fast"}').body).toEqual({ system: [identity] });
+
+    const untouched = `{"system":[${JSON.stringify(identity)}], "tools":[{},{}]}`;
+    const prepared = rewrite(untouched);
+    expect(new TextDecoder().decode(prepared.payload)).toBe(untouched);
+    expect(prepared.toolsOffered).toBe(2);
+  });
+
+  it("rejects bodies it cannot shape safely", () => {
+    for (const raw of [
+      "[]",
+      "{",
+      '{"a":1}x',
+      '{"a":[}',
+      '{"system":1}',
+      '{"model":"a","model":"b"}',
+    ]) {
+      expect(() => prepareBody(new TextEncoder().encode(raw))).toThrow();
+    }
   });
 });
 
@@ -98,7 +151,7 @@ describe("proxy", () => {
     expect(headers.get("anthropic-beta")).toBe(
       "oauth-2025-04-20,claude-code-20250219,context-1m-2025-08-07",
     );
-    const body = JSON.parse(String(init?.body));
+    const body = JSON.parse(sent(init));
     expect(body.model).toBe("claude-sonnet-5-5");
     expect(body.system[0].text).toBe(CLAUDE_CODE_IDENTITY);
     expect(body.system[1].text).toBe("Be terse.");
@@ -125,7 +178,7 @@ describe("proxy", () => {
         );
         expect(res.status).toBe(200);
         const [, init] = fetchMock.mock.calls[0] ?? [];
-        expect(JSON.parse(String(init?.body)).model).toBe(expected);
+        expect(JSON.parse(sent(init)).model).toBe(expected);
       }
     },
   );
@@ -166,7 +219,7 @@ describe("proxy", () => {
       expect(await res.json()).toEqual({ ok: true });
       const [url, init] = fetchMock.mock.calls[0] ?? [];
       expect(url).toBe(`https://upstream.test${options.path}`);
-      const forwarded = JSON.parse(String(init?.body));
+      const forwarded = JSON.parse(sent(init));
       expect(forwarded).toMatchObject({
         model: "claude-opus-5-5",
         max_tokens: 64,

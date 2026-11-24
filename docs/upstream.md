@@ -51,6 +51,12 @@ already matches, which keeps `cache_control` breakpoints intact.
 | `POST /v1/messages/count_tokens` | same | Identity injected so counts match what is billed; fast mode removed. |
 | `GET /v1/models`, `GET /v1/models/:id` | same | Passthrough. |
 
+Request bodies are edited in place at the byte level (see `src/body.ts`)
+rather than parsed and re-serialised: Claude Code bodies are often around
+1 MB, and concurrent requests share one isolate's 128 MB memory limit
+(exceeding it returns Cloudflare error 1102). Bodies over the upstream's 32 MB
+Messages limit are rejected with `413 request_too_large` before buffering.
+
 Gateway-style model IDs such as `anthropic/claude-opus-5-5` (OpenRouter
 convention) are rewritten to `claude-opus-5-5` in request bodies and
 `/v1/models/:id`; upstream answers the prefixed form with `not_found_error`.

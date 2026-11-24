@@ -67,31 +67,6 @@ export function normalizeModel(model: string): string {
   return model.replace(/^anthropic\//i, "");
 }
 
-type SystemBlock = { type: string; text?: string; [key: string]: unknown };
-
-/**
- * Returns `system` with the Claude Code identity as its own first text block,
- * converting a string prompt into blocks. Merging the identity into the
- * client's text does not satisfy the upstream check.
- */
-export function withIdentity(system: unknown): SystemBlock[] {
-  const identity: SystemBlock = { type: "text", text: CLAUDE_CODE_IDENTITY };
-  if (system === undefined || system === null || system === "") {
-    return [identity];
-  }
-  if (typeof system === "string") {
-    return [identity, { type: "text", text: system }];
-  }
-  if (Array.isArray(system)) {
-    const first = system[0] as SystemBlock | undefined;
-    if (first?.type === "text" && first.text === CLAUDE_CODE_IDENTITY) {
-      return system as SystemBlock[];
-    }
-    return [identity, ...(system as SystemBlock[])];
-  }
-  throw new TypeError("system must be a string or an array of content blocks");
-}
-
 /** Copies an upstream response, dropping headers that identify the account. */
 export function proxiedResponse(upstream: Response): Response {
   const response = new Response(upstream.body, upstream);

@@ -110,6 +110,7 @@ export function requestFacts(
   keyName: string,
   path: string,
   body: Record<string, unknown>,
+  counts: { toolsOffered: number; messages: number },
   headers: Headers,
   requestBytes: number,
 ): RequestFacts {
@@ -126,8 +127,8 @@ export function requestFacts(
     thinking: label(thinking?.type, 32),
     thinkingBudget: count(thinking?.budget_tokens),
     effort: label(output?.effort ?? body.effort, 32),
-    toolsOffered: Array.isArray(body.tools) ? body.tools.length : 0,
-    messages: Array.isArray(body.messages) ? body.messages.length : 0,
+    toolsOffered: counts.toolsOffered,
+    messages: counts.messages,
     requestBytes,
   };
 }

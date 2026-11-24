@@ -8,6 +8,7 @@ import {
   writeRecord,
 } from "./analytics";
 import { clientKey, configuredKeys, matchKey } from "./auth";
+import { type PreparedBody, prepareBody } from "./body";
 import type { Env } from "./env";
 import { errorResponse } from "./errors";
 import { STATS_PAGE } from "./page";
@@ -16,7 +17,6 @@ import {
   proxiedResponse,
   upstreamHeaders,
   upstreamUrl,
-  withIdentity,
 } from "./upstream";
 
 type AppEnv = { Bindings: Env; Variables: { token: string; keyName: string } };
@@ -77,7 +77,7 @@ async function forward(
   env: Env,
   token: string,
   path: string,
-  body?: string,
+  body?: Uint8Array,
 ): Promise<Response> {
   try {
     const upstream = await fetch(
@@ -97,34 +97,43 @@ async function forward(
   }
 }
 
+/**
+ * The upstream's Messages API request limit. Larger bodies would fail there
+ * anyway, and buffering them risks the isolate's 128 MB memory limit.
+ */
+const MAX_BODY_BYTES = 32 * 1024 * 1024;
+
 for (const path of ["/v1/messages", "/v1/messages/count_tokens"]) {
   app.post(path, async (c) => {
     const started = Date.now();
-    let body: Record<string, unknown>;
+    const tooLarge = () =>
+      errorResponse(
+        413,
+        "request_too_large",
+        `Request exceeds the maximum allowed number of bytes (${MAX_BODY_BYTES}).`,
+      );
+    if (Number(c.req.header("content-length") ?? 0) > MAX_BODY_BYTES) {
+      return tooLarge();
+    }
+    let prepared: PreparedBody;
     try {
-      const parsed: unknown = JSON.parse(await c.req.text());
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new TypeError("body must be a JSON object");
-      }
-      body = parsed as Record<string, unknown>;
-      if (typeof body.model === "string") {
-        body.model = normalizeModel(body.model);
-      }
-      body.system = withIdentity(body.system);
-      // Omitting fast mode selects the upstream's standard speed.
-      if (body.speed === "fast") delete body.speed;
+      // Raw bytes, not c.req: Hono would cache a second copy of the body.
+      const bytes = new Uint8Array(await c.req.raw.arrayBuffer());
+      if (bytes.length > MAX_BODY_BYTES) return tooLarge();
+      prepared = prepareBody(bytes);
     } catch (error) {
       const message = error instanceof Error ? error.message : `${error}`;
       return errorResponse(400, "invalid_request_error", message);
     }
 
-    const payload = JSON.stringify(body);
+    const { payload, fields } = prepared;
     const facts = requestFacts(
       c.var.keyName,
       path,
-      body,
+      fields,
+      prepared,
       c.req.raw.headers,
-      new TextEncoder().encode(payload).length,
+      payload.length,
     );
     const response = await forward(
       c.req.raw,
