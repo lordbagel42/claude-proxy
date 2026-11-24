@@ -22,7 +22,7 @@ else
   FROM claude_proxy_requests
   WHERE timestamp > NOW() - INTERVAL '$days' DAY AND blob2 = '/v1/messages'
   GROUP BY key, model ORDER BY requests DESC
-  FORMAT TabSeparatedWithNames"
+  FORMAT JSONEachRow"
 fi
 
 account="${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}"
