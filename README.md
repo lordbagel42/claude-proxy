@@ -41,7 +41,7 @@ pnpm dev                          # http://localhost:8787
 ```sh
 pnpm exec wrangler login
 pnpm exec wrangler secret put CLAUDE_CODE_OAUTH_TOKEN
-pnpm exec wrangler secret put PROXY_API_KEYS   # e.g. "laptop-key,ci-key"
+pnpm exec wrangler secret put PROXY_KEY_LAPTOP # one secret per client
 pnpm run deploy
 ```
 
@@ -50,14 +50,25 @@ custom domain (`routes` in `wrangler.jsonc`), which requires the `raygen.dev`
 zone to be in the same Cloudflare account. Wrangler creates the DNS record and
 certificate on deploy. To use a different hostname, change that route.
 
-Generate proxy keys with `openssl rand -hex 32`. Multiple comma-separated keys
-let you revoke one client without rotating the others. The proxy refuses all
-API requests when `PROXY_API_KEYS` is unset.
+Generate proxy keys with `openssl rand -hex 32`. Each client gets its own
+`PROXY_KEY_<NAME>` secret, so adding or revoking one never touches the others:
+
+```sh
+openssl rand -hex 32 | pnpm exec wrangler secret put PROXY_KEY_PI   # add
+pnpm exec wrangler secret delete PROXY_KEY_PI                       # revoke
+```
+
+The lowercased `<NAME>` labels that client in analytics. The older
+comma-separated `PROXY_API_KEYS` secret still works; its keys appear as
+`legacy-1`, `legacy-2`, … in order. The proxy refuses all API requests when no
+key is configured.
 
 | Name | Kind | Purpose |
 | --- | --- | --- |
 | `CLAUDE_CODE_OAUTH_TOKEN` | secret | Subscription token from `claude setup-token`. |
-| `PROXY_API_KEYS` | secret | Comma-separated keys clients must present. |
+| `PROXY_KEY_<NAME>` | secret | One client key per secret; `<NAME>` labels analytics. |
+| `PROXY_API_KEYS` | secret | Legacy comma-separated client keys. |
+| `ANALYTICS` | Analytics Engine | Dataset `claude_proxy_requests`; optional. |
 | `UPSTREAM_BASE_URL` | var | Defaults to `https://api.anthropic.com`. |
 | `CLAUDE_CODE_VERSION` | var | Version in the upstream `User-Agent`. |
 
@@ -106,3 +117,20 @@ See [AGENTS.md](AGENTS.md) for the workflow: trunk-based development on
 deploy from CI, set the repository variable `CLOUDFLARE_DEPLOY=true` and the
 secrets `CLOUDFLARE_API_TOKEN` (Workers edit permission) and
 `CLOUDFLARE_ACCOUNT_ID`. Worker secrets stay managed with `wrangler secret`.
+
+## Analytics
+
+Every `/v1/messages` and `count_tokens` request writes one data point to the
+`claude_proxy_requests` Analytics Engine dataset: key name, path, model,
+stream flag, status, duration, and for successful messages the input, output,
+cache-read and cache-write token counts. Prompts and completions are never
+recorded. Summarize usage per key and model with:
+
+```sh
+CLOUDFLARE_ACCOUNT_ID=… CLOUDFLARE_API_TOKEN=… scripts/usage.sh 30   # last 30 days
+```
+
+The token needs **Account Analytics: Read**. Columns: `index1`/`blob1` key,
+`blob2` path, `blob3` model, `blob4` `stream`|`json`, `double1` status,
+`double2` ms, `double3`–`double6` input, output, cache-read, cache-write
+tokens. Pass `--sql "…"` to run your own query.

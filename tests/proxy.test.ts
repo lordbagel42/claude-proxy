@@ -228,3 +228,98 @@ describe("proxy", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("named keys and analytics", () => {
+  function dataset() {
+    const points: AnalyticsEngineDataPoint[] = [];
+    return {
+      points,
+      writeDataPoint: (p?: AnalyticsEngineDataPoint) => p && points.push(p),
+    };
+  }
+
+  it("accepts PROXY_KEY_<NAME> alongside legacy keys and fails closed without either", async () => {
+    stubUpstream();
+    const named: Env = {
+      ...env,
+      PROXY_API_KEYS: undefined,
+      PROXY_KEY_PI: "pi-key",
+    };
+    const ok = await app.request(
+      "/v1/models",
+      { headers: { "x-api-key": "pi-key" } },
+      named,
+    );
+    expect(ok.status).toBe(200);
+    const legacy = await app.request(
+      "/v1/models",
+      { headers: { "x-api-key": "key-one" } },
+      named,
+    );
+    expect(legacy.status).toBe(401);
+    const none = await app.request(
+      "/v1/models",
+      { headers: { "x-api-key": "x" } },
+      { ...named, PROXY_KEY_PI: " " },
+    );
+    expect(none.status).toBe(500);
+  });
+
+  it("records key name and usage for JSON and streamed messages", async () => {
+    const analytics = dataset();
+    const named = {
+      ...env,
+      PROXY_KEY_PI: "pi-key",
+      ANALYTICS: analytics as unknown as AnalyticsEngineDataset,
+    };
+    stubUpstream(
+      Response.json({
+        usage: {
+          input_tokens: 7,
+          output_tokens: 3,
+          cache_read_input_tokens: 2,
+        },
+      }),
+    );
+    await app.request(
+      "/v1/messages",
+      {
+        method: "POST",
+        headers: { "x-api-key": "pi-key" },
+        body: JSON.stringify({ model: "claude-haiku-5-5", messages: [] }),
+      },
+      named,
+    );
+
+    const sse = [
+      'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":11,"output_tokens":1,"cache_creation_input_tokens":4}}}\n\n',
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"input_tokens":null,"cache_creation_input_tokens":0,"output_tokens":9}}\n\n',
+    ].join("");
+    stubUpstream(
+      new Response(sse, { headers: { "content-type": "text/event-stream" } }),
+    );
+    const res = await app.request(
+      "/v1/messages",
+      {
+        method: "POST",
+        headers: { "x-api-key": "key-two" },
+        body: JSON.stringify({ model: "m", stream: true, messages: [] }),
+      },
+      named,
+    );
+    expect(await res.text()).toBe(sse);
+
+    expect(analytics.points).toEqual([
+      {
+        indexes: ["pi"],
+        blobs: ["pi", "/v1/messages", "claude-haiku-5-5", "json"],
+        doubles: [200, expect.any(Number), 7, 3, 2, 0],
+      },
+      {
+        indexes: ["legacy-2"],
+        blobs: ["legacy-2", "/v1/messages", "m", "stream"],
+        doubles: [200, expect.any(Number), 11, 9, 0, 4],
+      },
+    ]);
+  });
+});

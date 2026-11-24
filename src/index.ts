@@ -1,5 +1,12 @@
 import { Hono } from "hono";
-import { clientKey, isAuthorized, parseProxyKeys } from "./auth";
+import {
+  applyUsage,
+  emptyUsage,
+  meterStream,
+  type RequestRecord,
+  writeRecord,
+} from "./analytics";
+import { clientKey, configuredKeys, matchKey } from "./auth";
 import type { Env } from "./env";
 import { errorResponse } from "./errors";
 import {
@@ -10,7 +17,7 @@ import {
   withIdentity,
 } from "./upstream";
 
-type AppEnv = { Bindings: Env; Variables: { token: string } };
+type AppEnv = { Bindings: Env; Variables: { token: string; keyName: string } };
 
 const app = new Hono<AppEnv>();
 
@@ -18,14 +25,16 @@ app.get("/", (c) => c.json({ status: "ok" }));
 app.get("/health", (c) => c.json({ status: "ok" }));
 
 app.use("/v1/*", async (c, next) => {
-  const keys = parseProxyKeys(c.env.PROXY_API_KEYS);
+  const keys = configuredKeys(c.env);
   if (keys.length === 0) {
-    return errorResponse(500, "api_error", "Proxy has no PROXY_API_KEYS.");
+    return errorResponse(500, "api_error", "Proxy has no proxy keys.");
   }
   const presented = clientKey(c.req.raw.headers);
-  if (!presented || !(await isAuthorized(presented, keys))) {
+  const keyName = presented ? await matchKey(presented, keys) : undefined;
+  if (!keyName) {
     return errorResponse(401, "authentication_error", "Invalid proxy key.");
   }
+  c.set("keyName", keyName);
   const token = c.env.CLAUDE_CODE_OAUTH_TOKEN?.trim();
   if (!token) {
     return errorResponse(
@@ -37,6 +46,18 @@ app.use("/v1/*", async (c, next) => {
   c.set("token", token);
   await next();
 });
+
+/** Keeps the Worker alive for `promise`; tests have no execution context. */
+function waitUntil(
+  c: { executionCtx: { waitUntil(promise: Promise<unknown>): void } },
+  promise: Promise<void>,
+) {
+  try {
+    c.executionCtx.waitUntil(promise);
+  } catch {
+    // No ExecutionContext outside workerd.
+  }
+}
 
 /** Sends a request to a fixed upstream path, keeping the client's query. */
 async function forward(
@@ -92,16 +113,47 @@ for (const path of ["/v1/messages", "/v1/messages/count_tokens"]) {
       path,
       JSON.stringify(body),
     );
-    console.log(
-      JSON.stringify({
-        event: "request",
-        path,
-        model: typeof body.model === "string" ? body.model : undefined,
-        stream: body.stream === true,
-        status: response.status,
+    const record: RequestRecord = {
+      keyName: c.var.keyName,
+      path,
+      model: typeof body.model === "string" ? body.model : undefined,
+      stream: body.stream === true,
+      status: response.status,
+      ms: 0,
+    };
+    const done = (usage?: RequestRecord["usage"]) =>
+      writeRecord(c.env.ANALYTICS, {
+        ...record,
+        usage,
         ms: Date.now() - started,
-      }),
-    );
+      });
+
+    // Only successful generations carry billable usage worth metering.
+    if (path !== "/v1/messages" || !response.ok || !response.body) {
+      done();
+      return response;
+    }
+    const type = response.headers.get("content-type") ?? "";
+    if (type.includes("text/event-stream")) {
+      let resolve = () => {};
+      const finished = new Promise<void>((r) => {
+        resolve = r;
+      });
+      waitUntil(c, finished);
+      const body = meterStream(response.body, (usage) => {
+        done(usage);
+        resolve();
+      });
+      return new Response(body, response);
+    }
+    try {
+      const usage = emptyUsage();
+      const json = (await response.clone().json()) as { usage?: unknown };
+      applyUsage(usage, json.usage);
+      done(json.usage ? usage : undefined);
+    } catch {
+      done();
+    }
     return response;
   });
 }

@@ -1,10 +1,42 @@
 const encoder = new TextEncoder();
 
+/** Prefix of per-client key secrets, e.g. `PROXY_KEY_LAPTOP`. */
+export const NAMED_KEY_PREFIX = "PROXY_KEY_";
+
+export interface ProxyKey {
+  /** Non-secret label used in analytics, e.g. `laptop` or `legacy-1`. */
+  name: string;
+  key: string;
+}
+
 export function parseProxyKeys(value: string | undefined): string[] {
   return (value ?? "")
     .split(",")
     .map((key) => key.trim())
     .filter((key) => key.length > 0);
+}
+
+/**
+ * Collects every configured key: one `PROXY_KEY_<NAME>` secret per client,
+ * plus the comma-separated `PROXY_API_KEYS` for older deployments.
+ */
+export function configuredKeys(env: object): ProxyKey[] {
+  const keys: ProxyKey[] = [];
+  for (const [binding, value] of Object.entries(env)) {
+    if (!binding.startsWith(NAMED_KEY_PREFIX) || typeof value !== "string") {
+      continue;
+    }
+    const name = binding.slice(NAMED_KEY_PREFIX.length).toLowerCase();
+    const key = value.trim();
+    if (name && key) keys.push({ name, key });
+  }
+  const legacy = (env as { PROXY_API_KEYS?: unknown }).PROXY_API_KEYS;
+  parseProxyKeys(typeof legacy === "string" ? legacy : undefined).forEach(
+    (key, i) => {
+      keys.push({ name: `legacy-${i + 1}`, key });
+    },
+  );
+  return keys;
 }
 
 /** Reads the client key from `x-api-key` or `Authorization: Bearer`. */
@@ -22,22 +54,23 @@ async function digest(value: string): Promise<Uint8Array> {
 }
 
 /**
- * Compares the presented key against every configured key without
- * short-circuiting, so timing does not reveal which key or prefix matched.
+ * Returns the name of the key matching `presented`, or undefined. Every key
+ * is compared without short-circuiting, so timing does not reveal which key
+ * or prefix matched.
  */
-export async function isAuthorized(
+export async function matchKey(
   presented: string,
-  keys: string[],
-): Promise<boolean> {
+  keys: ProxyKey[],
+): Promise<string | undefined> {
   const presentedDigest = await digest(presented);
-  let authorized = false;
-  for (const key of keys) {
+  let matched: string | undefined;
+  for (const { name, key } of keys) {
     const keyDigest = await digest(key);
     let diff = 0;
     for (let i = 0; i < keyDigest.length; i++) {
       diff |= (keyDigest[i] ?? 0) ^ (presentedDigest[i] ?? 0);
     }
-    authorized ||= diff === 0;
+    if (diff === 0 && matched === undefined) matched = name;
   }
-  return authorized;
+  return matched;
 }

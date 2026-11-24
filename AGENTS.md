@@ -63,12 +63,14 @@ proxy depends on.
 ## Secrets and privacy
 
 - Never print, log, or commit credentials: `CLAUDE_CODE_OAUTH_TOKEN`,
-  `PROXY_API_KEYS`, Cloudflare API tokens, or `.dev.vars` contents.
-- Never log prompt or completion bodies. Request logs are limited to method,
-  path, model, stream flag, status, and duration.
-- Keep the proxy fail-closed: with no `PROXY_API_KEYS` configured it must
-  refuse all API requests rather than become an open relay for the
-  subscription.
+  `PROXY_KEY_*`, `PROXY_API_KEYS`, Cloudflare API tokens, or `.dev.vars`
+  contents.
+- Never log prompt or completion bodies. Request logs and analytics are
+  limited to the key's name (never the key), path, model, stream flag, status,
+  duration, and token counts.
+- Keep the proxy fail-closed: with no `PROXY_KEY_*` or `PROXY_API_KEYS`
+  configured it must refuse all API requests rather than become an open relay
+  for the subscription.
 
 ## Deployment safety
 
