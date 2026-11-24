@@ -47,12 +47,19 @@ h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--text-2); 
 .tabs button[aria-pressed="true"] { background: var(--text); color: var(--surface); }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
 .grid { display: grid; gap: 12px; margin-bottom: 12px; }
-.tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tile .value { font-size: 20px; } }
+.tile .value, .tile .note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile .label { color: var(--text-2); font-size: 12px; }
 .tile .value { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px; }
 .tile .note { color: var(--text-3); font-size: 12px; }
 .two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-.three { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.breakdown { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.breakdown .tall { grid-row: span 2; }
+@media (max-width: 1000px) { .breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .breakdown { grid-template-columns: minmax(0, 1fr); } .breakdown .tall { grid-row: auto; } }
 .meter { margin-bottom: 14px; }
 .meter:last-child { margin-bottom: 0; }
 .meter .row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
@@ -62,16 +69,20 @@ h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--text-2); 
 .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-2); }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: inherit; font: inherit; padding: 2px 0; cursor: pointer; }
+.legend button[aria-pressed="false"] { opacity: 0.4; text-decoration: line-through; }
 .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .chart { position: relative; }
-.chart svg { display: block; width: 100%; height: 220px; overflow: visible; }
+.chart { min-height: 220px; }
+.chart svg { display: block; overflow: visible; }
+.chart .hit:hover { fill: var(--text); fill-opacity: 0.06; }
 .chart text { fill: var(--text-3); font-size: 11px; }
 .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.12); white-space: nowrap; z-index: 2; display: none; }
 .tip b { display: block; margin-bottom: 4px; color: var(--text); }
 .tip div { display: flex; align-items: center; gap: 6px; color: var(--text-2); }
 .tip div span:last-child { margin-left: auto; padding-left: 12px; color: var(--text); }
 .chart-head { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+.more { margin-top: 8px; }
 .link { background: none; border: 0; color: var(--text-2); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; padding: 0; }
 .list { list-style: none; margin: 0; padding: 0; }
 .list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 6px 0; border-top: 1px solid var(--grid); font-size: 13px; }
@@ -80,6 +91,7 @@ h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--text-2); 
 .list .val { color: var(--text-2); text-align: right; }
 .list .bar { grid-column: 1 / -1; height: 4px; background: var(--track); border-radius: 2px; overflow: hidden; }
 .list .bar i { display: block; height: 100%; background: var(--s1); border-radius: 2px; }
+.list li.more-row { display: block; }
 .list .meta { grid-column: 1 / -1; color: var(--text-3); font-size: 12px; }
 .empty { color: var(--text-3); font-size: 13px; }
 .table-wrap { overflow-x: auto; }
@@ -130,8 +142,8 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
     </div>
   </section>
 
-  <section class="grid three">
-    <div class="card"><h2>Tools called</h2><ul class="list" id="tools"></ul></div>
+  <section class="grid breakdown">
+    <div class="card tall"><h2>Tools called</h2><ul class="list" id="tools"></ul></div>
     <div class="card"><h2>Models</h2><ul class="list" id="models"></ul></div>
     <div class="card"><h2>Clients</h2><ul class="list" id="clients"></ul></div>
     <div class="card"><h2>Stop reasons</h2><ul class="list" id="stopReasons"></ul></div>
@@ -143,7 +155,7 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
   <section class="grid">
     <div class="card">
       <h2>Recent requests</h2>
-      <div class="table-wrap" id="recent"></div>
+      <div id="recent"></div>
     </div>
   </section>
 
@@ -158,9 +170,14 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
     { key: "cache_read", name: "Cache read", color: "var(--s3)" },
     { key: "cache_write", name: "Cache write", color: "var(--s4)" },
   ];
+  const LIST_LIMIT = 6, TOOLS_LIMIT = 12, RECENT_LIMIT = 15;
   let range = "30d";
   try { range = localStorage.getItem("range") || range; } catch {}
   if (!RANGES.includes(range)) range = "30d";
+  // UI state that must survive the once-a-minute refresh.
+  const expanded = new Set();
+  const hidden = new Set();
+  let data = null, rows = [];
 
   const $ = (id) => document.getElementById(id);
   const el = (tag, props = {}, ...kids) => {
@@ -179,22 +196,21 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
     return node;
   };
   const n = (v) => Number(v) || 0;
-  const compact = (v) => {
-    v = n(v);
-    if (Math.abs(v) < 1000) return String(Math.round(v));
-    return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(v);
-  };
+  const compactFmt = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+  const compact = (v) => compactFmt.format(n(v));
   const usd = (v) => {
     v = n(v);
     const digits = v > 0 && v < 1 ? 4 : 2;
     return "$" + v.toLocaleString("en", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   };
+  const usdAxis = (v) => v === 0 ? "$0" : v >= 1 ? "$" + compact(v) : "$" + Number(v.toPrecision(2));
   const full = (v) => new Intl.NumberFormat("en").format(Math.round(n(v)));
   const ms = (v) => v == null ? "–" : n(v) >= 1000 ? (n(v) / 1000).toFixed(1) + "s" : Math.round(n(v)) + "ms";
-  const pct = (v) => (n(v) * 100).toFixed(n(v) < 0.1 ? 1 : 0) + "%";
+  const pct = (v) => (n(v) * 100).toFixed(n(v) > 0 && n(v) < 0.01 ? 1 : 0) + "%";
+  const ratio = (a, b) => n(b) ? n(a) / n(b) : 0;
   const ago = (ts) => {
     const s = Math.round((Date.now() - ts) / 1000);
-    if (s < 60) return s + "s ago";
+    if (s < 60) return Math.max(0, s) + "s ago";
     if (s < 3600) return Math.round(s / 60) + "m ago";
     if (s < 86400) return Math.round(s / 3600) + "h ago";
     return Math.round(s / 86400) + "d ago";
@@ -212,6 +228,11 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
       ? d.toLocaleTimeString([], { hour: "numeric" })
       : d.toLocaleDateString([], { month: "short", day: "numeric" });
   };
+  const toggle = (label, isOpen, onClick) => {
+    const b = el("button", { type: "button", class: "link", "aria-expanded": String(isOpen) }, label);
+    b.onclick = onClick;
+    return b;
+  };
 
   function tabs() {
     const box = $("tabs");
@@ -225,23 +246,23 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
   function tiles(t, days) {
     t = t || {};
     const req = n(t.requests);
+    const prompt = n(t.input_tokens) + n(t.cache_read) + n(t.cache_write);
     const items = [
-      ["API cost equivalent", usd(t.cost_usd), n(t.unpriced) ? n(t.unpriced) + " requests on unpriced models" : "at pay-as-you-go API prices"],
+      ["API cost equivalent", usd(t.cost_usd), n(t.unpriced) ? n(t.unpriced) + " requests unpriced" : "at pay-as-you-go prices"],
       ["Requests", compact(req), full(req) + " in " + days],
-      ["Input tokens", compact(t.input_tokens), full(t.input_tokens)],
+      ["Input tokens", compact(t.input_tokens), "uncached prompt"],
       ["Output tokens", compact(t.output_tokens), full(t.output_tokens)],
-      ["Cache read", compact(t.cache_read), full(t.cache_read)],
+      ["Cache read", compact(t.cache_read), prompt ? pct(ratio(t.cache_read, prompt)) + " of prompt tokens" : ""],
       ["Cache write", compact(t.cache_write), full(t.cache_write)],
-      ["Tool calls", compact(t.tool_calls), req ? (n(t.tool_calls) / req).toFixed(1) + " per request" : ""],
+      ["Tool calls", compact(t.tool_calls), req ? ratio(t.tool_calls, req).toFixed(1) + " per request" : ""],
       ["Web searches", compact(t.web_searches), ""],
-      ["Errors", compact(t.errors), req ? pct(n(t.errors) / req) + " of requests" : ""],
+      ["Errors", compact(t.errors), req ? pct(ratio(t.errors, req)) + " of requests" : ""],
       ["Avg latency", ms(t.avg_ms), "max " + ms(t.max_ms)],
       ["Avg first token", ms(t.avg_ttft_ms), "streamed requests"],
-      ["Messages sent", compact(t.messages), req ? (n(t.messages) / req).toFixed(1) + " per request" : ""],
-      ["Request payload", compact(t.request_bytes) + "B", ""],
+      ["Avg conversation", req ? Math.round(ratio(t.messages, req)) + " msgs" : "–", compact(t.request_bytes) + "B sent in total"],
     ];
     $("tiles").replaceChildren(...items.map(([l, v, note]) =>
-      el("div", { class: "card tile" }, el("div", { class: "label" }, l), el("div", { class: "value" }, v), el("div", { class: "note" }, note))));
+      el("div", { class: "card tile" }, el("div", { class: "label" }, l), el("div", { class: "value", title: v }, v), el("div", { class: "note", title: note }, note))));
   }
 
   function limits(rl) {
@@ -272,25 +293,36 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
     return out;
   }
 
-  function barChart(box, rows, series, bucketMs, fmt) {
-    const axis = fmt || compact, value = fmt || full;
-    const tip = el("div", { class: "tip" });
-    const W = 1000, H = 220, L = 44, R = 4, T = 8, B = 22;
+  // Smallest 1/2/2.5/5 x 10^k step that is at least raw.
+  function niceStep(raw) {
+    if (!(raw > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    return [1, 2, 2.5, 5, 10].find((m) => m * p >= raw * 0.999999) * p;
+  }
+
+  // Drawn at the container's real pixel size so text is never stretched.
+  function barChart(box, rows, series, bucketMs, money) {
+    const axis = money ? usdAxis : compact, value = money ? usd : full;
+    const W = Math.max(240, Math.floor(box.clientWidth || 600)), H = 220, R = 4, T = 10, B = 24;
     const totals = rows.map((r) => series.reduce((s, x) => s + n(r[x.key]), 0));
-    const max = Math.max(1, ...totals);
-    const step = Math.pow(10, Math.floor(Math.log10(max)));
-    const nice = [1, 2, 2.5, 5, 10].map((m) => m * step).find((v) => v * 4 >= max) || step * 10;
-    const top = nice * 4 >= max ? nice * 4 : max;
-    const root = svg("svg", { viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "none", role: "img" });
+    const max = Math.max(0, ...totals);
+    let step = niceStep(max / 5);
+    if (!money) step = Math.max(1, step);
+    const ticks = Math.max(1, Math.ceil(max / step - 1e-9));
+    const top = step * ticks;
+    const labels = Array.from({ length: ticks + 1 }, (_, i) => axis(step * i));
+    const L = Math.max(...labels.map((s) => s.length)) * 6.5 + 12;
+    const root = svg("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img" });
     const y = (v) => T + (H - T - B) * (1 - v / top);
-    for (let i = 0; i <= 4; i++) {
-      const v = (top / 4) * i;
-      root.append(svg("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-width": 1, "vector-effect": "non-scaling-stroke" }));
-      const t = svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }); t.textContent = axis(v); root.append(t);
-    }
+    labels.forEach((text, i) => {
+      const yy = Math.round(y(step * i)) + 0.5;
+      root.append(svg("line", { x1: L, x2: W - R, y1: yy, y2: yy, stroke: "var(--grid)", "stroke-width": 1 }));
+      const t = svg("text", { x: L - 8, y: yy + 4, "text-anchor": "end" }); t.textContent = text; root.append(t);
+    });
     const slot = (W - L - R) / Math.max(1, rows.length);
-    const bw = Math.max(1, Math.min(28, slot - 2));
-    const labelEvery = Math.ceil(rows.length / 8);
+    const bw = Math.max(1, Math.min(28, slot * 0.75));
+    const labelEvery = Math.max(1, Math.ceil(rows.length / Math.max(2, Math.floor((W - L - R) / 72))));
+    const tip = el("div", { class: "tip" });
     rows.forEach((r, i) => {
       const x = L + slot * i + (slot - bw) / 2;
       let acc = 0;
@@ -298,14 +330,14 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
       segs.forEach((s, j) => {
         const v = n(r[s.key]);
         const y1 = y(acc + v), y0 = y(acc);
-        // 2px surface gap between stacked segments.
-        const h = Math.max(0, y0 - y1 - (j > 0 ? 2 : 0));
-        const isTop = j === segs.length - 1;
-        if (isTop) {
-          const rr = Math.min(4, bw / 2, h);
-          root.append(svg("path", { fill: s.color, d: "M" + x + "," + (y1 + h) + "V" + (y1 + rr) + "Q" + x + "," + y1 + " " + (x + rr) + "," + y1 + "H" + (x + bw - rr) + "Q" + (x + bw) + "," + y1 + " " + (x + bw) + "," + (y1 + rr) + "V" + (y1 + h) + "Z" }));
+        // 1px surface gap between stacked segments; keep tiny values visible.
+        const h = Math.max(1, y0 - y1 - (j > 0 ? 1 : 0));
+        const top1 = y0 - h - (j > 0 ? 1 : 0);
+        if (j === segs.length - 1) {
+          const rr = Math.min(3, bw / 2, h);
+          root.append(svg("path", { fill: s.color, d: "M" + x + "," + (top1 + h) + "V" + (top1 + rr) + "Q" + x + "," + top1 + " " + (x + rr) + "," + top1 + "H" + (x + bw - rr) + "Q" + (x + bw) + "," + top1 + " " + (x + bw) + "," + (top1 + rr) + "V" + (top1 + h) + "Z" }));
         } else {
-          root.append(svg("rect", { x, y: y1, width: bw, height: h, fill: s.color }));
+          root.append(svg("rect", { x, y: top1, width: bw, height: h, fill: s.color }));
         }
         acc += v;
       });
@@ -313,23 +345,24 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
         const t = svg("text", { x: L + slot * i + slot / 2, y: H - 6, "text-anchor": "middle" });
         t.textContent = when(n(r.bucket), bucketMs); root.append(t);
       }
-      const hit = svg("rect", { x: L + slot * i, y: T, width: slot, height: H - T - B, fill: "transparent" });
+      const hit = svg("rect", { class: "hit", x: L + slot * i, y: T, width: slot, height: H - T - B, fill: "transparent" });
       hit.addEventListener("mouseenter", () => {
-        tip.replaceChildren(el("b", {}, new Date(n(r.bucket)).toLocaleString([], bucketMs < 86400000 ? { month: "short", day: "numeric", hour: "numeric" } : { weekday: "short", month: "short", day: "numeric" })),
-          ...series.map((s) => el("div", {}, el("span", { class: "sw", style: "background:" + s.color }), el("span", {}, s.name), el("span", {}, value(r[s.key])))));
+        const head = new Date(n(r.bucket)).toLocaleString([], bucketMs < 86400000 ? { month: "short", day: "numeric", hour: "numeric" } : { weekday: "short", month: "short", day: "numeric" });
+        const lines = series.map((s) => el("div", {}, el("span", { class: "sw", style: "background:" + s.color }), el("span", {}, s.name), el("span", {}, value(r[s.key]))));
+        if (series.length > 1) lines.push(el("div", {}, el("span", {}, "Total"), el("span", {}, value(totals[i]))));
+        tip.replaceChildren(el("b", {}, head), ...lines);
         tip.style.display = "block";
       });
       hit.addEventListener("mousemove", (e) => {
         const b = box.getBoundingClientRect();
         const left = e.clientX - b.left + 12;
-        tip.style.left = Math.min(left, b.width - tip.offsetWidth) + "px";
+        tip.style.left = Math.max(0, Math.min(left, b.width - tip.offsetWidth)) + "px";
         tip.style.top = Math.max(0, e.clientY - b.top - tip.offsetHeight - 8) + "px";
       });
       hit.addEventListener("mouseleave", () => { tip.style.display = "none"; });
       root.append(hit);
     });
-    const label = series.map((s) => s.name).join(", ") + " per " + (bucketMs < 86400000 ? "hour" : "day");
-    root.setAttribute("aria-label", label);
+    root.setAttribute("aria-label", series.map((s) => s.name).join(", ") + " per " + (bucketMs < 86400000 ? "hour" : "day"));
     box.replaceChildren(root, tip);
   }
 
@@ -340,25 +373,59 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
     $("tokens-table").replaceChildren(el("table", {}, el("thead", {}, head), el("tbody", {}, ...body)));
   }
 
-  function list(id, rows, valueKey, fmt, meta) {
+  function legend() {
+    $("token-legend").replaceChildren(...SERIES.map((s) => {
+      const b = el("button", { type: "button", "aria-pressed": String(!hidden.has(s.key)), title: "Show or hide " + s.name },
+        el("span", { class: "sw", style: "background:" + s.color }), s.name);
+      b.onclick = () => {
+        if (hidden.has(s.key)) hidden.delete(s.key);
+        else if (hidden.size < SERIES.length - 1) hidden.add(s.key);
+        legend();
+        charts();
+      };
+      return b;
+    }));
+  }
+
+  function list(id, items, valueKey, fmt, meta, limit = LIST_LIMIT) {
     const box = $(id);
-    if (!rows || !rows.length) { box.replaceChildren(el("li", { class: "empty" }, "Nothing yet.")); return; }
-    const max = Math.max(1, ...rows.map((r) => n(r[valueKey])));
-    box.replaceChildren(...rows.map((r) => el("li", {},
+    if (!items || !items.length) { box.replaceChildren(el("li", { class: "empty" }, "Nothing yet.")); return; }
+    const open = expanded.has(id);
+    const shown = open ? items : items.slice(0, limit);
+    const max = Math.max(1, ...items.map((r) => n(r[valueKey])));
+    const lis = shown.map((r) => el("li", {},
       el("span", { class: "name", title: String(r.name) }, String(r.name)),
       el("span", { class: "val" }, fmt(r)),
       el("span", { class: "bar" }, el("i", { style: "width:" + (n(r[valueKey]) / max * 100) + "%" })),
-      meta ? el("span", { class: "meta" }, meta(r)) : null)));
+      meta ? el("span", { class: "meta" }, meta(r)) : null));
+    if (items.length > limit) {
+      lis.push(el("li", { class: "more-row" }, toggle(open ? "Show fewer" : "Show all " + items.length, open, () => {
+        if (open) expanded.delete(id); else expanded.add(id);
+        lists();
+      })));
+    }
+    box.replaceChildren(...lis);
   }
   const reqMeta = (r) => usd(r.cost_usd) + " · " + compact(r.input_tokens) + " in · " + compact(r.output_tokens) + " out · " + compact(r.cache_read) + " cached · " + ms(r.avg_ms) + " avg" + (n(r.errors) ? " · " + r.errors + " errors" : "");
 
-  function recent(rows) {
+  function lists() {
+    const d = data || {};
+    list("tools", d.tools, "calls", (r) => full(r.calls) + " calls", (r) => "in " + full(r.requests) + " requests", TOOLS_LIMIT);
+    for (const id of ["models", "clients", "stopReasons", "thinking", "effort"]) list(id, d[id], "requests", (r) => full(r.requests), reqMeta);
+    list("errorTypes", d.errorTypes, "requests", (r) => full(r.requests));
+  }
+
+  function recent(all) {
+    all = all || [];
+    const open = expanded.has("recent");
+    const rows = open ? all : all.slice(0, RECENT_LIMIT);
     const cols = ["When", "Model", "Client", "Status", "Stop", "Input", "Output", "Cache r/w", "Cost", "Tools", "Thinking", "Latency", "TTFT"];
     const head = el("tr", {}, ...cols.map((c, i) => el("th", { class: i >= 5 && i !== 9 && i !== 10 ? "num" : "" }, c)));
-    const body = (rows || []).map((r) => {
+    const body = rows.map((r) => {
       let tools = [];
       try { tools = JSON.parse(r.tool_names || "[]"); } catch {}
-      const toolText = tools.length ? tools.length + " (" + [...new Set(tools)].slice(0, 3).join(", ") + (new Set(tools).size > 3 ? "…" : "") + ")" : "–";
+      const uniq = [...new Set(tools)];
+      const toolText = tools.length ? tools.length + " (" + uniq.slice(0, 2).join(", ") + (uniq.length > 2 ? ", …" : "") + ")" : "–";
       return el("tr", {},
         el("td", { title: new Date(n(r.ts)).toLocaleString() }, ago(n(r.ts))),
         el("td", {}, r.model || "–"),
@@ -369,36 +436,59 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
         el("td", { class: "num" }, full(r.output_tokens)),
         el("td", { class: "num" }, compact(r.cache_read) + " / " + compact(r.cache_write)),
         el("td", { class: "num" }, r.cost_usd == null ? "–" : usd(r.cost_usd)),
-        el("td", {}, toolText),
+        el("td", { title: uniq.join(", ") }, toolText),
         el("td", {}, (r.thinking || "–") + (r.effort ? " · " + r.effort : "")),
         el("td", { class: "num" }, ms(r.ms)),
         el("td", { class: "num" }, ms(r.ttft_ms)));
     });
-    $("recent").replaceChildren(body.length ? el("table", {}, el("thead", {}, head), el("tbody", {}, ...body)) : el("p", { class: "empty" }, "No requests yet."));
+    if (!body.length) { $("recent").replaceChildren(el("p", { class: "empty" }, "No requests yet.")); return; }
+    const kids = [el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, head), el("tbody", {}, ...body)))];
+    if (all.length > RECENT_LIMIT) {
+      kids.push(el("div", { class: "more" }, toggle(open ? "Show fewer" : "Show all " + all.length, open, () => {
+        if (open) expanded.delete("recent"); else expanded.add("recent");
+        recent(all);
+      })));
+    }
+    $("recent").replaceChildren(...kids);
   }
 
-  $("token-legend").replaceChildren(...SERIES.map((s) => el("span", {}, el("span", { class: "sw", style: "background:" + s.color }), s.name)));
+  function charts() {
+    if (!data) return;
+    const b = data.bucketMs;
+    barChart($("tokens-chart"), rows, SERIES.filter((s) => !hidden.has(s.key)), b);
+    barChart($("cost-chart"), rows, [{ key: "cost_usd", name: "API cost", color: "var(--s1)" }], b, true);
+    barChart($("requests-chart"), rows, [{ key: "requests", name: "Requests", color: "var(--s1)" }], b);
+  }
+
   $("table-toggle").onclick = () => {
     const t = $("tokens-table"); t.hidden = !t.hidden;
     $("table-toggle").textContent = t.hidden ? "Show table" : "Hide table";
   };
 
+  let lastWidth = 0, frame = 0;
+  new ResizeObserver(() => {
+    const w = document.querySelector("main").clientWidth;
+    if (w === lastWidth) return;
+    lastWidth = w;
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(charts);
+  }).observe(document.querySelector("main"));
+
   async function load() {
+    const want = range;
     try {
-      const res = await fetch("/stats.json?range=" + encodeURIComponent(range));
+      const res = await fetch("/stats.json?range=" + encodeURIComponent(want));
       if (!res.ok) throw new Error("HTTP " + res.status);
       const d = await res.json();
-      const days = range === "24h" ? "24 hours" : range.replace("d", " days");
-      const rows = fillBuckets(d.series || [], d.since, d.now, d.bucketMs);
+      if (want !== range) return; // a newer range was picked meanwhile
+      const days = want === "24h" ? "24 hours" : want.replace("d", " days");
+      data = d;
+      rows = fillBuckets(d.series || [], d.since, d.now, d.bucketMs);
       tiles(d.totals, days);
       limits(d.rateLimit);
-      barChart($("tokens-chart"), rows, SERIES, d.bucketMs);
-      barChart($("cost-chart"), rows, [{ key: "cost_usd", name: "API cost (USD)", color: "var(--s1)", fmt: usd }], d.bucketMs, usd);
-      barChart($("requests-chart"), rows, [{ key: "requests", name: "Requests", color: "var(--s1)" }], d.bucketMs);
+      charts();
       tokenTable(rows, d.bucketMs);
-      list("tools", d.tools, "calls", (r) => full(r.calls) + " calls", (r) => "in " + full(r.requests) + " requests");
-      for (const id of ["models", "clients", "stopReasons", "thinking", "effort"]) list(id, d[id], "requests", (r) => full(r.requests), reqMeta);
-      list("errorTypes", d.errorTypes, "requests", (r) => full(r.requests));
+      lists();
       recent(d.recent);
       $("updated").textContent = "Last " + days + " · updated " + new Date().toLocaleTimeString();
     } catch (e) {
@@ -407,6 +497,7 @@ footer { color: var(--text-3); font-size: 12px; margin-top: 20px; }
   }
 
   tabs();
+  legend();
   load();
   setInterval(load, 60000);
 })();
