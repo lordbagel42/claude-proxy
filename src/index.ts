@@ -1,14 +1,16 @@
 import { Hono } from "hono";
 import {
-  applyUsage,
-  emptyUsage,
+  Meter,
   meterStream,
-  type RequestRecord,
+  requestFacts,
+  responseFacts,
+  statsStore,
   writeRecord,
 } from "./analytics";
 import { clientKey, configuredKeys, matchKey } from "./auth";
 import type { Env } from "./env";
 import { errorResponse } from "./errors";
+import { STATS_PAGE } from "./page";
 import {
   normalizeModel,
   proxiedResponse,
@@ -21,8 +23,18 @@ type AppEnv = { Bindings: Env; Variables: { token: string; keyName: string } };
 
 const app = new Hono<AppEnv>();
 
-app.get("/", (c) => c.json({ status: "ok" }));
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+// Public usage dashboard (metadata only; see src/analytics.ts).
+app.get("/", (c) => c.html(STATS_PAGE));
+app.get("/stats", (c) => c.html(STATS_PAGE));
+app.get("/stats.json", async (c) => {
+  if (!c.env.STATS) {
+    return errorResponse(503, "api_error", "Stats storage is not configured.");
+  }
+  const stats = await statsStore(c.env.STATS).stats(c.req.query("range"));
+  return c.json(stats, 200, { "cache-control": "public, max-age=30" });
+});
 
 app.use("/v1/*", async (c, next) => {
   const keys = configuredKeys(c.env);
@@ -106,54 +118,46 @@ for (const path of ["/v1/messages", "/v1/messages/count_tokens"]) {
       return errorResponse(400, "invalid_request_error", message);
     }
 
+    const payload = JSON.stringify(body);
+    const facts = requestFacts(
+      c.var.keyName,
+      path,
+      body,
+      c.req.raw.headers,
+      new TextEncoder().encode(payload).length,
+    );
     const response = await forward(
       c.req.raw,
       c.env,
       c.var.token,
       path,
-      JSON.stringify(body),
+      payload,
     );
-    const record: RequestRecord = {
-      keyName: c.var.keyName,
-      path,
-      model: typeof body.model === "string" ? body.model : undefined,
-      stream: body.stream === true,
-      status: response.status,
-      ms: 0,
-    };
-    const done = (usage?: RequestRecord["usage"]) =>
-      writeRecord(c.env.ANALYTICS, {
-        ...record,
-        usage,
-        ms: Date.now() - started,
+    const meter = new Meter();
+    const done = () =>
+      writeRecord(c.env, {
+        ...facts,
+        ...responseFacts(meter, response.status, response.headers, started),
       });
 
-    // Only successful generations carry billable usage worth metering.
-    if (path !== "/v1/messages" || !response.ok || !response.body) {
-      done();
-      return response;
-    }
     const type = response.headers.get("content-type") ?? "";
-    if (type.includes("text/event-stream")) {
+    if (response.body && type.includes("text/event-stream")) {
       let resolve = () => {};
       const finished = new Promise<void>((r) => {
         resolve = r;
       });
       waitUntil(c, finished);
-      const body = meterStream(response.body, (usage) => {
-        done(usage);
-        resolve();
+      const stream = meterStream(response.body, meter, () => {
+        done().finally(resolve);
       });
-      return new Response(body, response);
+      return new Response(stream, response);
     }
     try {
-      const usage = emptyUsage();
-      const json = (await response.clone().json()) as { usage?: unknown };
-      applyUsage(usage, json.usage);
-      done(json.usage ? usage : undefined);
+      meter.message(await response.clone().json());
     } catch {
-      done();
+      // Not JSON; record status and timing only.
     }
+    waitUntil(c, done());
     return response;
   });
 }

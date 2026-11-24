@@ -1,13 +1,17 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "claude-proxy",
-  "main": "src/index.ts",
+  "main": "src/worker.ts",
   "compatibility_date": "2026-10-01",
   "observability": { "enabled": true },
   "routes": [{ "pattern": "claude.raygen.dev", "custom_domain": true }],
   "analytics_engine_datasets": [
     { "binding": "ANALYTICS", "dataset": "claude_proxy_requests" }
   ],
+  "durable_objects": {
+    "bindings": [{ "name": "STATS", "class_name": "StatsStore" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StatsStore"] }],
   "vars": {
     "UPSTREAM_BASE_URL": "https://api.anthropic.com",
     "CLAUDE_CODE_VERSION": "2.1.296"

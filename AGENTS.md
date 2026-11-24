@@ -66,8 +66,12 @@ proxy depends on.
   `PROXY_KEY_*`, `PROXY_API_KEYS`, Cloudflare API tokens, or `.dev.vars`
   contents.
 - Never log prompt or completion bodies. Request logs and analytics are
-  limited to the key's name (never the key), path, model, stream flag, status,
-  duration, and token counts.
+  limited to request metadata: the key's name (never the key), path, model,
+  client, request settings, status, stop reason, timings, token counts, tool
+  names called, and rate-limit headers.
+- The usage page (`/`, `/stats`, `/stats.json`) is public by the owner's
+  choice. It must show aggregates only: never break usage down by proxy key or
+  show key names.
 - Keep the proxy fail-closed: with no `PROXY_KEY_*` or `PROXY_API_KEYS`
   configured it must refuse all API requests rather than become an open relay
   for the subscription.

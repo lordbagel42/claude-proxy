@@ -69,6 +69,7 @@ key is configured.
 | `PROXY_KEY_<NAME>` | secret | One client key per secret; `<NAME>` labels analytics. |
 | `PROXY_API_KEYS` | secret | Legacy comma-separated client keys. |
 | `ANALYTICS` | Analytics Engine | Dataset `claude_proxy_requests`; optional. |
+| `STATS` | Durable Object | `StatsStore`, backs the usage page; optional. |
 | `UPSTREAM_BASE_URL` | var | Defaults to `https://api.anthropic.com`. |
 | `CLAUDE_CODE_VERSION` | var | Version in the upstream `User-Agent`. |
 
@@ -118,9 +119,25 @@ deploy from CI, set the repository variable `CLOUDFLARE_DEPLOY=true` and the
 secrets `CLOUDFLARE_API_TOKEN` (Workers edit permission) and
 `CLOUDFLARE_ACCOUNT_ID`. Worker secrets stay managed with `wrangler secret`.
 
-## Analytics
+## Usage page
 
-Every `/v1/messages` and `count_tokens` request writes one data point to the
+`https://claude.raygen.dev/` (also `/stats`) is a public dashboard of
+aggregate usage: requests, input/output/cache tokens, tool calls by tool name,
+web searches, models, clients, stop reasons, errors, thinking and effort
+settings, latency and time to first token, subscription rate-limit utilization
+(5-hour and 7-day windows), what the traffic would have cost at pay-as-you-go
+API prices (`src/pricing.ts`; requests on models it doesn't know are counted
+as unpriced), and the 50 most recent requests. The raw data is at
+`/stats.json?range=24h|7d|30d|90d|365d`. It never shows usage per proxy key or
+key names, and never stores prompt or completion text.
+
+Each proxied request writes one metadata row to the `StatsStore` Durable Object
+(SQLite storage, a single instance; schema in `src/stats.ts`). It needs no
+setup beyond deploying; the `migrations` entry in `wrangler.jsonc` creates it.
+
+## Analytics Engine
+
+Every `/v1/messages` and `count_tokens` request also writes one data point to the
 `claude_proxy_requests` Analytics Engine dataset: key name, path, model,
 stream flag, status, duration, and for successful messages the input, output,
 cache-read and cache-write token counts. Prompts and completions are never

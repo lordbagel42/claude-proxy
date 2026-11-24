@@ -323,3 +323,103 @@ describe("named keys and analytics", () => {
     ]);
   });
 });
+
+describe("stats rows", () => {
+  it("stores tools, stop reason, rate limits and request settings, but no content", async () => {
+    const rows: Record<string, unknown>[] = [];
+    const store = {
+      record: async (row: Record<string, unknown>) => {
+        rows.push(row);
+      },
+    };
+    const stats = {
+      idFromName: () => "id",
+      get: () => store,
+    } as unknown as NonNullable<Env["STATS"]>;
+    const sse = [
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":20,"cache_read_input_tokens":5}}}\n\n',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","name":"bash","input":{}}}\n\n',
+      'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","name":"read","input":{}}}\n\n',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":12}}\n\n',
+    ].join("");
+    stubUpstream(
+      new Response(sse, {
+        headers: {
+          "content-type": "text/event-stream",
+          "anthropic-ratelimit-unified-5h-utilization": "0.25",
+          "anthropic-ratelimit-unified-status": "allowed",
+        },
+      }),
+    );
+    const res = await app.request(
+      "/v1/messages",
+      {
+        method: "POST",
+        headers: { "x-api-key": "key-one", "user-agent": "pi (darwin)" },
+        body: JSON.stringify({
+          model: "claude-haiku-5-5",
+          stream: true,
+          max_tokens: 1000,
+          thinking: { type: "enabled", budget_tokens: 500 },
+          tools: [{ name: "bash" }, { name: "read" }, { name: "edit" }],
+          messages: [{ role: "user", content: "SECRET PROMPT" }],
+        }),
+      },
+      { ...env, STATS: stats },
+    );
+    await res.text();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rows).toHaveLength(1);
+    const row = rows[0] ?? {};
+    expect(JSON.stringify(row)).not.toContain("SECRET");
+    expect(row).toMatchObject({
+      key: "legacy-1",
+      model: "claude-haiku-5-5",
+      client: "pi",
+      stop_reason: "tool_use",
+      tool_names: '["bash","read"]',
+      thinking: "enabled",
+      rl_5h: 0.25,
+      rl_status: "allowed",
+      input_tokens: 20,
+      output_tokens: 12,
+      cache_read: 5,
+      tools_offered: 3,
+      tool_calls: 2,
+    });
+    // Haiku 5.5: 20 x $0.10 + 12 x $0.50 + 5 x $0.01 per MTok
+    expect(row.cost_usd).toBeCloseTo(0.00000805);
+  });
+});
+
+describe("apiCost", () => {
+  it("prices tokens per model, including Haiku's long-prompt tier", async () => {
+    const { apiCost } = await import("../src/pricing");
+    const usage = {
+      input: 1_000_000,
+      output: 1_000_000,
+      cacheRead: 1_000_000,
+      cacheCreation: 1_000_000,
+    };
+    // Opus 5.5: 4 + 20 + 0.2 + 5
+    expect(apiCost("claude-opus-5-5", usage)).toBeCloseTo(29.2);
+    // Haiku 5.5 above 100K prompt tokens: 0.5 + 2.5 + 0.05 + 0.625
+    expect(apiCost("claude-haiku-5-5", usage)).toBeCloseTo(3.675);
+    expect(
+      apiCost("claude-haiku-5-5", {
+        input: 1000,
+        output: 0,
+        cacheRead: 0,
+        cacheCreation: 0,
+      }),
+    ).toBeCloseTo(0.0001);
+    expect(
+      apiCost("claude-haiku-4-5-20251001", {
+        ...usage,
+        cacheRead: 0,
+        cacheCreation: 0,
+      }),
+    ).toBeCloseTo(6);
+    expect(apiCost("mystery-model", usage)).toBeUndefined();
+  });
+});
